@@ -119,7 +119,7 @@ binary-arch: build install
 	dh_install -v --sourcedir=debian/tmp
 	dh_installman
 	dh_link
-	dh_strip --dbg-package=osso-chess-ui
+	dh_strip --dbg-package=osso-chess-ui-dbg
 	dh_compress
 	dh_fixperms
 	dh_installdeb
