@@ -57,7 +57,11 @@ chessui_LDFLAGS = -Wl,--version-script=export.map
 UNWANTED = -export-dynamic \
            -Wl,--export-dynamic
 
+# the static libraries before the -l flags (--as-needed drops a library
+# nothing named yet)
 chessui_LDADD = \
+	ui/libchessui.a \
+	babychess/libbabychess.a \
 	$(filter-out $(UNWANTED), \
 	$(MAEMO_LAUNCHER_LDFLAGS) \
 	$(GTK_LIBS)   \
@@ -66,6 +70,4 @@ chessui_LDADD = \
 	$(PNG_LIBS)   \
 	$(PANGO_LIBS) \
 	$(CANBERRA_LIBS) \
-	$(ESOUND_LIBS) \
-	ui/libchessui.a \
-	babychess/libbabychess.a)
+	$(ESOUND_LIBS))
