@@ -32,5 +32,5 @@ To redraw the pictures: `python3 data/make-art.py` (rsvg-convert, Pillow).
 
 ## Licence
 
-GPL 2 or later (Nokia's code, BabyChess by Sebastian Pipping); the pieces
+GPL 2 or later (Nokia's code, BabyChess by Jérôme Kunegis); the pieces
 under the GPL, as allowed by their author's choice of licences.
