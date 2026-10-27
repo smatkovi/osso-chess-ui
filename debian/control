@@ -1,16 +1,20 @@
 Source: osso-chess-ui
 Section: games
 Priority: optional
-Maintainer: Maske Amish <amish.maske@nokia.com>
-Build-Depends: intltool, libhildon1-dev,debhelper (>= 4.0.0), dbus (>= 0.22), libdbus-glib-1-2 (>= 0.22), libatk1.0-0 (>= 1.6.0), libatk1.0-dev (>= 1.6.0), libc6 (>= 2.3), libgtk2.0-0 (>= 2.2), libgtk2.0-dev (>= 2.2), libgconf2-4 (>= 2.6), libpng16-16 (>= 1.2.0), libpng-dev (>= 1.2.0), libpango1.0-0 (>= 1.6.0), libpango1.0-dev (>= 1.6.0), libglib2.0-dev (>= 2.2), libdbus-1-dev (>= 0.22), libdbus-glib-1-dev (>= 0.22), libosso-dev, libgconf2-dev, libgnomevfs2-dev, osso-games-startup-dev, libhildonfm2-dev (>= 2.16.2), libhildonmime-dev, libcomapp-dev, maemo-launcher-dev (>= 0.22),libcanberra-dev
+Maintainer: Sebastian Matkovich <sebastian.matkovich@gmail.com>
+Build-Depends: intltool, libhildon1-dev, debhelper (>= 4.0.0), libatk1.0-dev, libgtk2.0-dev, libpng-dev, libpango1.0-dev, libglib2.0-dev, libdbus-1-dev, libdbus-glib-1-dev, libosso-dev, libgconf2-dev, osso-games-startup-dev, libhildonfm2-dev, libhildonmime-dev, libcomapp-dev, maemo-launcher-dev, libcanberra-dev, autoconf, automake, libtool
 Standards-Version: 3.6.0
+XSB-Homepage: https://github.com/smatkovi/osso-chess-ui
+XSBC-Bugtracker: https://github.com/smatkovi/osso-chess-ui/issues
 
 Package: osso-chess-ui
 Architecture: any
-Depends: osso-games-l10n-mr | osso-games-l10n-mr0, ${shlibs:Depends}, ${misc:Depends}, osso-games-startup (>=1.0.40-0), gnuchess, osso-graphics-game-chess (>=1.0), osso-sounds-game-chess, ${launcher:Depends}, hildon-fm-l10n-mr | hildon-fm-l10n-mr0, hildon-common-strings-l10n-mr | hildon-common-strings-l10n-mr0, hildon-libs-l10n-mr | hildon-libs-l10n-mr0
-Description: Chess user interface
- OSSO Chess user interface. Required chess engine, GNU Chess, and OSSO games
- Start-up screen provided separately.
+Depends: osso-games-l10n-mr | osso-games-l10n-mr0, ${shlibs:Depends}, ${misc:Depends}, osso-games-startup (>=1.0.40-0), gnuchess, ${launcher:Depends}, hildon-fm-l10n-mr | hildon-fm-l10n-mr0, hildon-common-strings-l10n-mr | hildon-common-strings-l10n-mr0, hildon-libs-l10n-mr | hildon-libs-l10n-mr0
+Recommends: osso-sounds-game-chess
+Description: Chess against GNU Chess
+ The Nokia N900's chess game, playing against GNU Chess, with its own
+ board and pieces (the N900's pictures were Nokia's).
+XB-Maemo-Display-Name: Chess
 
 Package: osso-chess-ui-dbg
 Architecture: any

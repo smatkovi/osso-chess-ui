@@ -22,6 +22,7 @@
 */
 
 /* Include function prototypes */
+#include "babychess/ui_scale.hh"
 #include "interface.hh"
 #include <gtk/gtk.h>
 #include <hildon/hildon-banner.h>
@@ -130,10 +131,6 @@ gboolean ui_create_main_window( void *app_data )
   g_signal_connect(G_OBJECT(app_ui_data->window), "delete-event",
                    G_CALLBACK(delete_window_cb), app_ui_data);
 
-  g_signal_connect(G_OBJECT(app_ui_data->window), "button_press_event",
-                   G_CALLBACK(on_back_button_press), app_ui_data);
-  g_signal_connect(GTK_WIDGET(app_ui_data->window), "button_release_event",
-		   G_CALLBACK(on_back_button_release), app_ui_data);	
 
   ui_create_chessboard(app_ui_data);
 
@@ -158,7 +155,8 @@ void ui_create_chessboard(AppUIData *app_ui_data)
   app_ui_data->game = new Game_Editor();
   app_ui_data->game->Open(app_ui_data->bbox);
   osso_log(LOG_DEBUG,"Setting game editor size");
-  app_ui_data->game->Set_Size(BOARD_WIDTH, BOARD_HEIGHT);
+  /* as high as the screen (480 on the N900), the board square in it */
+  app_ui_data->game->Set_Size(UI_LENGTH(490), UI_LENGTH(480));
 
 }
 
@@ -170,14 +168,26 @@ void ui_create_control(AppUIData *app_ui_data)
   osso_log(LOG_DEBUG,"Creating control area");
   app_ui_data->control = gtk_fixed_new();
   gtk_widget_set_size_request(app_ui_data->control,
-  	CTRL_WIDTH, CTRL_HEIGHT);
+  	UI_LENGTH(CTRL_WIDTH), CTRL_HEIGHT);
   gtk_container_add( GTK_CONTAINER (app_ui_data->main_hbox),
   		app_ui_data->control );
 
   /* Background image */
   osso_log(LOG_DEBUG,"Setting background image");
-  app_ui_data->control_image = gtk_image_new_from_file(
-  	PIXMAPSDIR "/" CTRL_IMAGE );
+  {
+    GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(PIXMAPSDIR "/" CTRL_IMAGE, NULL);
+
+    if (pixbuf) {
+      GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pixbuf,
+          UI_LENGTH(gdk_pixbuf_get_width(pixbuf) / (double) CHESS_ART_SCALE),
+          UI_LENGTH(gdk_pixbuf_get_height(pixbuf) / (double) CHESS_ART_SCALE),
+          GDK_INTERP_HYPER);
+      app_ui_data->control_image = gtk_image_new_from_pixbuf(scaled);
+      g_object_unref(scaled);
+      g_object_unref(pixbuf);
+    } else
+      app_ui_data->control_image = gtk_image_new();
+  }
 
   gtk_fixed_put(GTK_FIXED(app_ui_data->control),
   	app_ui_data->control_image, 0, 0);
@@ -190,7 +200,7 @@ void ui_create_control(AppUIData *app_ui_data)
   osso_log(LOG_DEBUG,"Undo button: Position");
   tmp1 = gtk_hbox_new(TRUE, 0);
   gtk_fixed_put(GTK_FIXED(app_ui_data->control), tmp1,
-  	CTRL_UNDO_BUTTON_LEFT, CTRL_UNDO_BUTTON_TOP);
+  	UI_LENGTH(CTRL_UNDO_BUTTON_LEFT), UI_LENGTH(CTRL_UNDO_BUTTON_TOP));
 
   /* Undo button: Make BabyChess Widget of the hbox, set expose events */
   osso_log(LOG_DEBUG,"Undo button: Babychess workaround");
@@ -208,7 +218,7 @@ void ui_create_control(AppUIData *app_ui_data)
   osso_log(LOG_DEBUG,"Redo button: Position");
   tmp1 = gtk_hbox_new(TRUE, 0);
   gtk_fixed_put(GTK_FIXED(app_ui_data->control), tmp1,
-  	CTRL_REDO_BUTTON_LEFT, CTRL_REDO_BUTTON_TOP);
+  	UI_LENGTH(CTRL_REDO_BUTTON_LEFT), UI_LENGTH(CTRL_REDO_BUTTON_TOP));
 
   osso_log(LOG_DEBUG,"Redo button: Babychess workaround");
   tmp2 = new Widget();
@@ -224,7 +234,7 @@ void ui_create_control(AppUIData *app_ui_data)
   osso_log(LOG_DEBUG,"White player: Position");
   tmp1 = gtk_hbox_new(TRUE, 0);
   gtk_fixed_put(GTK_FIXED(app_ui_data->control), tmp1,
-  	CTRL_STATUS_WHITE_LEFT, CTRL_STATUS_WHITE_TOP);
+  	UI_LENGTH(CTRL_STATUS_WHITE_LEFT), UI_LENGTH(CTRL_STATUS_WHITE_TOP));
 
   tmp2 = new Widget();
   tmp2->Attach(tmp1, true);
@@ -236,7 +246,7 @@ void ui_create_control(AppUIData *app_ui_data)
   osso_log(LOG_DEBUG,"Black player: Position");
   tmp1 = gtk_hbox_new(TRUE, 0);
   gtk_fixed_put(GTK_FIXED(app_ui_data->control), tmp1,
-  	CTRL_STATUS_BLACK_LEFT, CTRL_STATUS_BLACK_TOP);
+  	UI_LENGTH(CTRL_STATUS_BLACK_LEFT), UI_LENGTH(CTRL_STATUS_BLACK_TOP));
 
   tmp2 = new Widget();
   tmp2->Attach(tmp1, true);
@@ -252,7 +262,7 @@ void ui_create_control(AppUIData *app_ui_data)
   osso_log(LOG_DEBUG,"Last moves list: View label");
   GtkLabel *tmp = GTK_LABEL( gtk_label_new("") );
   gtk_fixed_put(GTK_FIXED(app_ui_data->control), GTK_WIDGET(tmp),
-  	CTRL_MOVES_LEFT, CTRL_MOVES_TOP);
+  	UI_LENGTH(CTRL_MOVES_LEFT), UI_LENGTH(CTRL_MOVES_TOP));
 
   osso_log(LOG_DEBUG,"Last moves list: Component");
   app_ui_data->moves_list = new Chess_Moves_List(tmp);
@@ -260,20 +270,22 @@ void ui_create_control(AppUIData *app_ui_data)
   /* Overlay Button */
   tmp1 = gtk_drawing_area_new();
   app_ui_data->overlay_button = tmp1;
-  gtk_widget_set_size_request(GTK_WIDGET(tmp1), 118, 65);
+  gtk_widget_set_size_request(GTK_WIDGET(tmp1), UI_LENGTH(118), UI_LENGTH(65));
   gtk_fixed_put(GTK_FIXED(app_ui_data->control), tmp1,
-  	CTRL_OVR_BUTTON_LEFT, CTRL_OVR_BUTTON_TOP);
+  	UI_LENGTH(CTRL_OVR_BUTTON_LEFT), UI_LENGTH(CTRL_OVR_BUTTON_TOP));
   GError *error = NULL;
 
   app_ui_data->overlay_back = gtk_icon_theme_load_icon(
 		  gtk_icon_theme_get_default(), "general_overlay_back",
-		  64, GTK_ICON_LOOKUP_NO_SVG, &error);
+		  UI_LENGTH(48), GTK_ICON_LOOKUP_FORCE_SIZE, &error);
 
-  /*gtk_widget_add_events(GTK_WIDGET(tmp1),
-		GDK_POINTER_MOTION_MASK |
-		GDK_BUTTON_MOTION_MASK |
+  gtk_widget_add_events(GTK_WIDGET(tmp1),
 		GDK_BUTTON_PRESS_MASK |
-		GDK_BUTTON_RELEASE_MASK);*/
+		GDK_BUTTON_RELEASE_MASK);
+  g_signal_connect(GTK_WIDGET(tmp1), "button-press-event",
+		  G_CALLBACK(on_overlay_press), app_ui_data);
+  g_signal_connect(GTK_WIDGET(tmp1), "button-release-event",
+		  G_CALLBACK(on_overlay_release), app_ui_data);
 
   g_signal_connect(GTK_WIDGET(app_ui_data->overlay_button),
 		  "expose-event", G_CALLBACK(on_overlay_expose),

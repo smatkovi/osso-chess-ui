@@ -1,7 +1,7 @@
 INCLUDES = $(GTK_CFLAGS) $(GCONF_CFLAGS) $(OSSO_CFLAGS) $(PNG_CFLAGS) \
 	   $(PANGO_CFLAGS) $(MAEMO_LAUNCHER_CFLAGS)
-CC=g++
-lib_LIBRARIES = libbabychess.a
+CC=$(CXX)
+noinst_LIBRARIES = libbabychess.a
 libbabychess_a_CFLAGS = $(INCLUDES) \
 		-DLOCALEDIR=\"$(chessuilocaledir)\" \
 		-DPIXMAPSDIR=\"$(pixmapsdir)\" \
@@ -9,6 +9,7 @@ libbabychess_a_CFLAGS = $(INCLUDES) \
 libbabychess_a_CXXFLAGS = $(libbabychess_a_CFLAGS)
 
 libbabychess_a_SOURCES = \
+	ui_scale.cc ui_scale.hh \
 	alpha_client_image.cc alpha_client_image.hh \
 	alpha_client_image_stream.cc alpha_client_image_stream.hh \
 	alpha_server_image.hh alpha_server_image_stream.cc \

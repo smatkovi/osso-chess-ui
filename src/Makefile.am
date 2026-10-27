@@ -2,7 +2,8 @@ SUBDIRS = babychess ui plugin
 INCLUDES = $(GTK_CFLAGS) $(OSSO_CFLAGS) $(GCONF_CFLAGS) $(PNG_CFLAGS) \
 	   $(PANGO_CFLAGS) $(ESOUND_CFLAGS) $(CANBERRA_CFLAGS)
 	   
-CC=g++
+# the .c files include C++ headers: compiled as C++
+CC=$(CXX)
 
 servicefiledir=$(prefix)/share/dbus-1/services
 servicefile_DATA = com.nokia.osso_chess.service \
@@ -11,7 +12,7 @@ servicefile_DATA = com.nokia.osso_chess.service \
 configdir = $(datadir)/osso-chess-ui
 config_DATA = osso_chess.conf
 
-backupconfigurationdir=/etc/osso-backup/applications
+backupconfigurationdir=$(sysconfdir)/osso-backup/applications
 backupconfiguration_DATA=osso_chess_backup.conf
 
 hildondesktopentry_DATA = chess_startup.desktop

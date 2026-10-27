@@ -1,8 +1,8 @@
 INCLUDES = $(GTK_CFLAGS) $(GCONF_CFLAGS) $(OSSO_CFLAGS) $(PANGO_CFLAGS) $(MAEMO_LAUNCHER_CFLAGS)
 
-CC=g++
+CC=$(CXX)
 
-lib_LIBRARIES = libchessui.a
+noinst_LIBRARIES = libchessui.a
 
 libchessui_a_CFLAGS = $(INCLUDES) \
 		-DLOCALEDIR=\"$(chessuilocaledir)\" \

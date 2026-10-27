@@ -24,6 +24,9 @@
 #ifndef CHESS_ENGINECOMMUNICATION_HH
 #define CHESS_ENGINECOMMUNICATION_HH
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/poll.h>
@@ -37,7 +40,9 @@
 #include "chess_timing.hh"
 #include "chess_communication.hh"
 
+#ifndef ENGINE_EXECUTABLE_PATH
 #define ENGINE_EXECUTABLE_PATH "/usr/games/gnuchess"
+#endif
 
 /* Define to use popen(). Otherwise pipe pair will be used.
    The popen way is simplier and better but does not provide feedback.
@@ -65,9 +70,14 @@
 #define ENGINE_CMD_QUIT    "quit"
 #define ENGINE_CMD_FORCE   "force"
 
+/* GNU Chess 5 said "Illegal move", 6 says "Invalid move: <move>" (and an
+ * empty "Invalid move: " for some commands, which is not about a move) */
 #define ENGINE_REPLY_ILLEGAL_MOVE "Illegal move"
+#define ENGINE_REPLY_INVALID_MOVE "Invalid move:"
 #define ENGINE_REPLY_RESULT       "RESULT"
-#define ENGINE_REPLY_MOVE         "My move is:"
+/* "My move is: e7e5" from GNU Chess 5, "My move is : e7e5" from 6; the
+ * move follows the colon (engine_reply_move()) */
+#define ENGINE_REPLY_MOVE         "My move is"
 #define ENGINE_REPLY_BLACK_WINS   "0-1"
 #define ENGINE_REPLY_WHITE_WINS   "1-0"
 #define ENGINE_REPLY_DRAW         "1/2-1/2"
@@ -167,5 +177,33 @@ public:
 Engine *get_chess_engine();
 gboolean deinit_engine();
 void set_engine_settings(Engine *chess_engine);
+
+/* The move in an engine's "My move is" reply, or NULL */
+static inline const gchar *
+engine_reply_move(const gchar * reply)
+{
+    const gchar *p = strstr(reply, ENGINE_REPLY_MOVE);
+
+    if (p == NULL || (p = strchr(p, ':')) == NULL)
+        return NULL;
+    for (p++; *p == ' '; p++)
+        ;
+    return *p ? p : NULL;
+}
+
+/* Whether an engine's reply says the move sent was not legal */
+static inline gboolean
+engine_reply_illegal(const gchar * reply)
+{
+    const gchar *p;
+
+    if (strstr(reply, ENGINE_REPLY_ILLEGAL_MOVE) != NULL)
+        return TRUE;
+    if ((p = strstr(reply, ENGINE_REPLY_INVALID_MOVE)) == NULL)
+        return FALSE;
+    for (p += strlen(ENGINE_REPLY_INVALID_MOVE); *p == ' '; p++)
+        ;
+    return *p != '\0' && *p != '\n' && *p != '\r';
+}
 
 #endif

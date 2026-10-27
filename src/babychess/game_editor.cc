@@ -891,12 +891,11 @@ Game_Editor::Engine_Play()
 
             g_assert(res);
 
-            gchar *pos = NULL;
+            const gchar *pos = NULL;
             /* Handle the move reply from engine */
-            if ((pos = strstr(res, ENGINE_REPLY_MOVE)) != NULL)
+            if ((pos = engine_reply_move(res)) != NULL)
             {
                 String tmp;
-                pos += strlen(ENGINE_REPLY_MOVE) + 1;
                 tmp = pos;
 
                 int move = game.Get_Generator().Get_e2e4_Notation_Move(tmp);

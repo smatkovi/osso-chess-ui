@@ -17,7 +17,7 @@ AC_PROG_LN_S
 CFLAGS="$CFLAGS -W -Wall"
 CXXFLAGS="$CXXFLAGS -W -Wall"
 
-PKG_CHECK_MODULES(GTK, gtk+-2.0 >= 2.2 gnome-vfs-2.0 x11 hildon-1 >= 0.8.1)
+PKG_CHECK_MODULES(GTK, gtk+-2.0 >= 2.2 x11 hildon-1 >= 0.8.1)
 AC_SUBST(GTK_CFLAGS)
 AC_SUBST(GTK_LIBS)
 
@@ -59,6 +59,12 @@ AM_CONDITIONAL(HAVE_26_MIME, test x$UPDATE_MIME_DATABASE != xno)
 AC_PATH_PROG(UPDATE_DESKTOP_DATABASE, update-desktop-database, no)
 AM_CONDITIONAL(HAVE_28_MIME, test x$UPDATE_DESKTOP_DATABASE != xno)
 
+dnl The chess engine, run in its xboard mode
+AC_ARG_WITH([gnuchess],
+  [AS_HELP_STRING([--with-gnuchess=PATH], [GNU Chess (default /usr/games/gnuchess)])],
+  [gnuchess=$withval], [gnuchess=/usr/games/gnuchess])
+AC_DEFINE_UNQUOTED([ENGINE_EXECUTABLE_PATH], ["$gnuchess"], [GNU Chess])
+
 pixmapsdir=${datadir}/pixmaps/osso-chess/
 AC_SUBST(pixmapsdir)
 
@@ -68,10 +74,10 @@ AC_SUBST(soundsdir)
 chessuilocaledir=${datadir}/locale
 AC_SUBST(chessuilocaledir)
 
-desktopentrydir=/usr/share/applications
+desktopentrydir=${datadir}/applications
 AC_SUBST(desktopentrydir)
 
-mimedir=/usr/share/mime/packages
+mimedir=${datadir}/mime/packages
 AC_SUBST(mimedir)
 
 hildondesktopentrydir=${desktopentrydir}/hildon
@@ -93,6 +99,7 @@ AC_SUBST(dbusservdir)
 
 AC_CONFIG_FILES(
 Makefile
+data/Makefile
 src/Makefile
 src/ui/Makefile
 src/babychess/Makefile

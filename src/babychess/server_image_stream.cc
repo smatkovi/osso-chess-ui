@@ -1,6 +1,7 @@
 #include "server_image_stream.hh"
 #include <libosso.h>
 #include "chess_log.h"
+#include "ui_scale.hh"
 
 bool
 Write_Stream(Stream &, 
@@ -34,6 +35,16 @@ Read_Stream(Stream &stream,
   image=gdk_pixbuf_new_from_file(stream.Get_Filename()(),&error);
 
   g_assert(image);
+  /* the control panel's pictures at the screen's scale */
+  {
+    int w = UI_LENGTH(gdk_pixbuf_get_width(image) / (double) CHESS_ART_SCALE);
+    int h = UI_LENGTH(gdk_pixbuf_get_height(image) / (double) CHESS_ART_SCALE);
+    if (w != gdk_pixbuf_get_width(image) || h != gdk_pixbuf_get_height(image)) {
+      GdkPixbuf *scaled = gdk_pixbuf_scale_simple(image, w, h, GDK_INTERP_HYPER);
+      g_object_unref(image);
+      image = scaled;
+    }
+  }
   client_image.Set_Pixbuf(image);
   
 	/*if (! Read_Stream(stream,

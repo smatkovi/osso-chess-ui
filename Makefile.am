@@ -10,7 +10,7 @@ EXTRA_DIST = \
 	debian/osso-chess-ui.links \
 	debian/rules
 
-SUBDIRS = src
+SUBDIRS = src data
 
 INCLUDES = $(GTK_CFLAGS) $(OSSO_CFLAGS) $(GCONF_CFLAGS) $(PNG_CFLAGS)
 

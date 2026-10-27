@@ -32,7 +32,7 @@
 #include "babychess/widget.hh"
 
 #define MOVES_LIST_NUMBER_SIZE 10
-#define MOVES_LIST_TURNS_CNT 7
+#define MOVES_LIST_TURNS_CNT 6
 #define MOVES_LIST_FONT "Nokia Sans 16"
 //#define MOVES_LIST_FONT "-*-helvetica-bold-r-normal--*-180-*-*-*-*-iso8859-1"
 //#define MOVES_LIST_FONT "-*-helvetica-bold-r-normal--*-260-*-*-*-*-utf-8"
@@ -205,7 +205,8 @@ private:
 	void Update() {
 		gint i=0, num=0, start=0;
 		gchar number[MOVES_LIST_NUMBER_SIZE];
-		GString *line = g_string_new("<span font_desc=\""
+		/* light on the panel's dark well (data/make-art.py) */
+		GString *line = g_string_new("<span foreground=\"#e1e4e6\" font_desc=\""
 			MOVES_LIST_FONT "\">");
 
 		num = moves->len;

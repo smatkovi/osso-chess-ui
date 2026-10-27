@@ -497,7 +497,7 @@ Engine::move(const gchar * command)
         g_assert(res);
 
         /* Got move from engine */
-        if (strstr(res, ENGINE_REPLY_MOVE) != NULL)
+        if (engine_reply_move(res) != NULL)
         {
             GString *tmp = g_string_new(res);
             g_ptr_array_add(input_buffer, (gpointer) tmp);
@@ -507,7 +507,7 @@ Engine::move(const gchar * command)
         }
 
         /* Got illegal move reply from engine */
-        if (strstr(res, ENGINE_REPLY_ILLEGAL_MOVE) != NULL)
+        if (engine_reply_illegal(res))
         {
             result = FALSE;
         }

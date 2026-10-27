@@ -26,13 +26,13 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/vfs.h>
+#include <gio/gio.h>
 #include <libgen.h>
 #include <gtk/gtk.h>
 
 #include <gconf/gconf.h>
 #include <gconf/gconf-client.h>
 
-#include <libgnomevfs/gnome-vfs.h>
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -182,8 +182,7 @@ GSList * opponent_group = NULL;
 
 gboolean is_new_file;
 
-GnomeVFSHandle *read_handle=NULL;
-GnomeVFSMonitorHandle *monitor_handle=NULL;
+GFileMonitor *monitor_handle=NULL;
    
 gint selected_difficulty = -1;
 gint selected_player = chess_human_invalid;
@@ -211,8 +210,8 @@ static void       plugin_cb                         (GtkWidget   *menu_item,
 static GtkWidget *get_ui_cb                         (void);
 
 static gchar*     settings_get_string               (const gchar *key);
-static void       plugin_volume_unmounted_cb        (GnomeVFSVolumeMonitor *vfsvolumemonitor,
-                                                     GnomeVFSVolume *volume, gpointer user_data);
+static void       plugin_volume_unmounted_cb        (GVolumeMonitor *volume_monitor,
+                                                     GMount *mount, gpointer user_data);
 static void       plugin_ui_show_save_nommc_dialog	  (void);
 static void       plugin_ui_show_load_err             (int err_type, gchar *loadfile);
 static gboolean   plugin_settings_get_bool_fallback	  (gchar *key, gboolean fall);
@@ -237,9 +236,10 @@ static void 			plugin_wait_for_save(void);
 gboolean    plugin_select_separator  (GtkTreeModel *model,GtkTreeIter *iter,gpointer data);
 gboolean    plugin_sound_keypress_cb      (GtkWidget   *widget,GdkEventKey *event,gpointer     user_data);
 gboolean    plugin_opponent_keypress_cb      (GtkWidget   *widget,GdkEventKey *event,gpointer     user_data);
-static void file_monitor_cb( GnomeVFSMonitorHandle * handle,
-                            	const gchar * monitor_uri, const gchar * info_uri,
-                            	GnomeVFSMonitorEventType event_type, gpointer user_data );
+static void file_monitor_cb( GFileMonitor * monitor, GFile * file,
+                            	GFile * other_file, GFileMonitorEvent event_type,
+                            	gpointer user_data );
+static void file_monitor_set( const gchar * filename );
 
 static StartupPluginInfo plugin_info = {
   load_plugin,
@@ -448,15 +448,6 @@ load_plugin (void)
   GtkWidget *game_hbox, *game_vbox;
   GtkSizeGroup *groupleft= GTK_SIZE_GROUP( gtk_size_group_new( GTK_SIZE_GROUP_BOTH ) ),*groupright= GTK_SIZE_GROUP( gtk_size_group_new( GTK_SIZE_GROUP_BOTH ) );
   int enable_sound, show_legal_moves, color_white,  difficulty_level;
-  gboolean gnomevfs_ok;  
-
-	if (!gnome_vfs_initialized()) {
-    gnomevfs_ok = gnome_vfs_init();
-    if (!gnomevfs_ok) {
-        puts("GnomeVFS init failed");
-        return NULL;
-    }
-  }
 
   bindtextdomain (GETTEXT_PACKAGE, CHESSLOCALEDIR);
   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
@@ -563,16 +554,7 @@ unload_plugin (void)
 
 	plugin_restore_last_settings();
 
-	if( monitor_handle ) {
-		gnome_vfs_monitor_cancel( monitor_handle );
-		monitor_handle = NULL;
-	}
-
-	if (read_handle)
-	{
-		gnome_vfs_close(read_handle);
-    read_handle=NULL;
-	}
+	file_monitor_set( NULL );
 	write_config();
 }
 
@@ -655,18 +637,14 @@ static void game_load_cb(void)
 static void game_save_cb(void)
 {
   gchar *file = settings_get_string(SETTINGS_CHESS_SAVE_FILE);
-  GnomeVFSFileInfo *file_info = gnome_vfs_file_info_new();
-  GnomeVFSResult vfs_res = file ? gnome_vfs_get_file_info(file,
-      file_info,
-      GNOME_VFS_FILE_INFO_FOLLOW_LINKS) : GNOME_VFS_ERROR_GENERIC;
-	if (read_handle)
-	{
-		gnome_vfs_close(read_handle);
-		read_handle=NULL;
-	}
+  GFileType type = G_FILE_TYPE_UNKNOWN;
+  if (file) {
+    GFile *f = g_file_new_for_commandline_arg(file);
+    type = g_file_query_file_type(f, G_FILE_QUERY_INFO_NONE, NULL);
+    g_object_unref(f);
+  }
   plugin_set_settings();
-  if (vfs_res == GNOME_VFS_OK &&
-      file_info->type == GNOME_VFS_FILE_TYPE_REGULAR) {
+  if (type == G_FILE_TYPE_REGULAR) {
     is_new_file = FALSE;
     game_save();
   }
@@ -674,8 +652,6 @@ static void game_save_cb(void)
     is_new_file = TRUE;
     game_save();
   }
-
-  gnome_vfs_file_info_unref(file_info);
 
   if (file != NULL) 
     g_free(file);
@@ -685,11 +661,6 @@ static void game_save_cb(void)
 static void game_save_as_cb(void)
 {
   gchar *old_filename = settings_get_string(SETTINGS_CHESS_SAVE_FILE);
-  if (read_handle) {
-	gnome_vfs_close(read_handle);
-	read_handle=NULL;
-  }
-  
   if (ui_show_file_chooser(FALSE) == TRUE) {
     gchar *new_filename = plugin_settings_get_string(SETTINGS_CHESS_SAVE_FILE);
     if (g_strcasecmp(old_filename, new_filename) != 0) {
@@ -698,13 +669,8 @@ static void game_save_as_cb(void)
       is_new_file = FALSE;
     }
     
-	if( monitor_handle ) {
-		gnome_vfs_monitor_cancel( monitor_handle );
-		monitor_handle = NULL;
-	}    
-    gnome_vfs_monitor_add( &monitor_handle, new_filename,
-    	GNOME_VFS_MONITOR_FILE, file_monitor_cb, NULL );
-                                                         
+    file_monitor_set( new_filename );
+
     if (new_filename) {
       g_free(new_filename);
     }
@@ -726,25 +692,26 @@ static void game_save_as_cb(void)
 static gboolean
 validate_chess_file( const gchar * filename ) {
 
-	GnomeVFSHandle * handle = NULL;
+	GFile * file = g_file_new_for_commandline_arg( filename );
+	GFileInputStream * stream = g_file_read( file, NULL, NULL );
 	gchar buffer[ 64 ];
-    GnomeVFSFileSize size;
-    guint at;
-    GnomeVFSResult ret;
+    gssize size;
+    gint at;
 
-	ret = gnome_vfs_open( &handle, filename, GNOME_VFS_OPEN_READ );
-	if( ret != GNOME_VFS_OK ) {
-
-	
+	g_object_unref( file );
+	if( stream == NULL ) {
 		return FALSE;
 	}
 	
 	/* Read first 64 bytes (should be enough always) */
-	gnome_vfs_read( handle, buffer, 64, &size );
-	gnome_vfs_close(handle);
+	size = g_input_stream_read( G_INPUT_STREAM( stream ), buffer, 64, NULL, NULL );
+	g_object_unref( stream );
+	if( size < 0 ) {
+		return FALSE;
+	}
 	
 	/* Skip the empty chars (shouldn't be any but to be sure) */
-	for( at = 0; at < size; ++at ) {
+	for( at = 0; at < (gint)size; ++at ) {
 		gchar c = buffer[at];
 		if( c != ' ' && c != '\t' && c != '\n' && c != '\r' ) {
 			break;
@@ -809,7 +776,7 @@ ui_show_file_chooser(gboolean open)
         g_free(chess_save_folder);
       folder_path = g_build_filename((const gchar*)getenv("MYDOCSDIR"),
           SETTINGS_CHESS_SAVE_FOLDER_DEFAULT, NULL);
-      chess_save_folder = gnome_vfs_escape_path_string(folder_path);
+      chess_save_folder = g_uri_escape_string(folder_path, "/", FALSE);
       g_free(folder_path);
     }
 
@@ -850,18 +817,18 @@ ui_show_file_chooser(gboolean open)
     
         if (!open)
         {
-	        GnomeVFSURI *test_uri = gnome_vfs_uri_new(filename);
-      
-            if (gnome_vfs_uri_exists(test_uri)) {
+	        GFile *test_file = g_file_new_for_commandline_arg(filename);
+	        gboolean exists = g_file_query_exists(test_file, NULL);
+
+	        g_object_unref(test_file);
+            if (exists) {
                 if (!ui_show_replace_file_dialog(filename))
                     {
-                        gnome_vfs_uri_unref(test_uri);
                         g_free(filename);
 
                         return FALSE;
                     }
                 }
-            gnome_vfs_uri_unref(test_uri);
         }
 
         pathname = g_strdup(filename);
@@ -873,12 +840,7 @@ ui_show_file_chooser(gboolean open)
             chess_save_folder = pathname;
         }
         
-		if( monitor_handle ) {
-			gnome_vfs_monitor_cancel( monitor_handle );
-			monitor_handle = NULL;
-		}    
-	    gnome_vfs_monitor_add( &monitor_handle, filename,
-	    	GNOME_VFS_MONITOR_FILE, file_monitor_cb, NULL );
+	    file_monitor_set( filename );
         
         /* Set filename */
         if (!plugin_settings_set_string(SETTINGS_CHESS_SAVE_FILE, filename) ) {
@@ -931,7 +893,7 @@ ui_show_replace_file_dialog(gchar *file)
   gint answer;
   gchar *fname=NULL,*bname=NULL;
   bname=g_path_get_basename(file);
-  fname=gnome_vfs_unescape_string(bname,NULL);
+  fname=g_uri_unescape_string(bname,NULL);
   g_free(bname);
   gchar *tmp = g_strdup_printf( D_("docm_nc_replace_file"));
   g_free(fname);
@@ -942,7 +904,7 @@ ui_show_replace_file_dialog(gchar *file)
 	tmp));
 
  /* Rama - changed here */
- fc_dialog = note;
+ fc_dialog = GTK_WIDGET(note);
 		  
   g_signal_connect(G_OBJECT(note), "key-press-event", G_CALLBACK(key_press_for_cancelling_dialog), NULL);
   answer = gtk_dialog_run(GTK_DIALOG(note));
@@ -1140,7 +1102,9 @@ static void plugin_ui_show_load_err(int err_type, gchar *loadfile)
   switch (err_type) {
     case GAME_LOAD_FILE_UNSUPPORTED: 
     {
-      gchar *filename = gnome_vfs_format_uri_for_display(loadfile);
+      GFile *file = g_file_new_for_commandline_arg(loadfile);
+      gchar *filename = g_file_get_parse_name(file);
+      g_object_unref(file);
       gchar *basename = g_path_get_basename(filename);
       gchar *temp = g_strrstr(basename, ".");
       if (temp) *temp = '\0';
@@ -1162,7 +1126,7 @@ static void plugin_ui_show_load_err(int err_type, gchar *loadfile)
       GTK_WINDOW(gs.ui->hildon_appview), __("sfil_ni_unable_to_open_file_not_found") ));
       hildon_note_set_button_text(note, __("sfil_ni_unable_to_open_file_not_found_ok"));
       /* Rama - changed here */
-      fc_dialog = note;
+      fc_dialog = GTK_WIDGET(note);
       
       gtk_dialog_run(GTK_DIALOG(note));
       gtk_widget_destroy(GTK_WIDGET(note));
@@ -1186,22 +1150,15 @@ void game_load(gchar *filename)
         exit(0);
     }
     gchar *loadfile = g_strdup(filename);
-    if (read_handle)
-    {
-        gnome_vfs_close(read_handle);
-        read_handle=NULL;
-    }
-    GnomeVFSResult result;
-    result = gnome_vfs_open (&read_handle, loadfile, GNOME_VFS_OPEN_READ);
-    if (result != GNOME_VFS_OK)
+    GFile *file = g_file_new_for_commandline_arg(loadfile);
+    GFileInputStream *stream = g_file_read(file, NULL, NULL);
+    g_object_unref(file);
+    if (stream == NULL)
     {
         plugin_ui_show_load_err(GAME_LOAD_FILE_NOT_FOUND, loadfile);
-        read_handle=NULL;
         return;
-    } else {
-        gnome_vfs_close(read_handle);
-        read_handle=NULL;    
     }
+    g_object_unref(stream);
 
     plugin_settings_set_bool(SETTINGS_CHESS_LOAD_IN_PROGRESS, TRUE);
 
@@ -1246,11 +1203,6 @@ void game_load(gchar *filename)
                 g_free(loadfile);
             osso_rpc_free_val (&retval);
             plugin_settings_set_string(SETTINGS_CHESS_SAVE_FILE,"");
-            if (read_handle)
-            {
-                gnome_vfs_close(read_handle);
-                read_handle=NULL;
-            }
             gs.startup_ui_state_change_cb(gs.ui->app, GAME_CLOSED,
                     GAME_CLOSED, gs.ui);
             return;
@@ -1270,31 +1222,25 @@ void game_load(gchar *filename)
 }
 
 /** Callback function when the volume unmounted */
-static void plugin_volume_unmounted_cb(GnomeVFSVolumeMonitor *vfsvolumemonitor,
-  GnomeVFSVolume *volume, gpointer user_data)
+static void plugin_volume_unmounted_cb(GVolumeMonitor *volume_monitor,
+  GMount *mount, gpointer user_data)
 {
   gchar *dst_text = NULL;
   gchar *volume_text = NULL;
-  GnomeVFSURI *dst_uri;
-  gchar *uri_scheme;
-  vfsvolumemonitor=NULL;
-  user_data=NULL;
-
+  (void)volume_monitor;
+  (void)user_data;
 
   dst_text = settings_get_string(SETTINGS_CHESS_SAVE_FILE);
-  uri_scheme = gnome_vfs_get_uri_scheme(dst_text);
-  if (!uri_scheme)
-    dst_text = gnome_vfs_get_uri_from_local_path(dst_text);
-  else
-    g_free(uri_scheme);
-  dst_uri = gnome_vfs_uri_new(dst_text);    
-  g_free(dst_text);
-  
-  dst_text = gnome_vfs_uri_to_string(dst_uri, GNOME_VFS_URI_HIDE_NONE);
-
   if (dst_text != NULL) {
+    GFile *dst = g_file_new_for_commandline_arg(dst_text);
+    GFile *root = g_mount_get_root(mount);
+
+    g_free(dst_text);
+    dst_text = g_file_get_uri(dst);
     /* the mount point of the changed volume */
-    volume_text = gnome_vfs_volume_get_activation_uri(volume);
+    volume_text = g_file_get_uri(root);
+    g_object_unref(dst);
+    g_object_unref(root);
   }
   
   /* check if unmounting this volume has anything to do with us */
@@ -1318,7 +1264,7 @@ static void plugin_ui_show_save_nommc_dialog(void)
   hildon_note_set_button_text(note, _("ckct_bd_cannot_save_mmc_cover_open_ok"));
   
   /* Rama - changed here */
-  fc_dialog = note;
+  fc_dialog = GTK_WIDGET(note);
   gtk_dialog_run(GTK_DIALOG(note));
   gtk_widget_destroy(GTK_WIDGET(note));
 
@@ -1332,10 +1278,10 @@ static void plugin_ui_show_save_nommc_dialog(void)
 static void game_save(void)
 {
   gdouble cpos = 0.1;
-  gchar *tmp_text, *dst_text;
-  GnomeVFSURI *tmp_uri, *dst_uri;
-  GnomeVFSResult vfs_res;
-  gchar *uri_scheme;
+  gchar *dst_text;
+  GFile *tmp_file, *dst_file;
+  GError *copy_error = NULL;
+  gboolean copied;
   
   /* Set where the MMC is mounted */
   const gchar *mmc_env = NULL;      
@@ -1347,24 +1293,23 @@ static void game_save(void)
   /* Monitor MMC state */
   guint volume_monitor_id = 0;
   is_mmc = FALSE;
-  GnomeVFSVolumeMonitor *volume_monitor;
-  volume_monitor = gnome_vfs_get_volume_monitor();
-  volume_monitor_id = g_signal_connect(G_OBJECT(volume_monitor), "volume_unmounted", 
+  GVolumeMonitor *volume_monitor;
+  volume_monitor = g_volume_monitor_get();
+  volume_monitor_id = g_signal_connect(G_OBJECT(volume_monitor), "mount-removed", 
     G_CALLBACK(plugin_volume_unmounted_cb), NULL);
   dst_text = settings_get_string(SETTINGS_CHESS_SAVE_FILE);
 
   /* Checking if there is enough free space */
   struct statfs info;
   gchar *unuried_fname=NULL;
-  unuried_fname=gnome_vfs_get_local_path_from_uri(dst_text);
+  unuried_fname=g_filename_from_uri(dst_text, NULL, NULL);
   if (unuried_fname) {
 	g_strrstr(unuried_fname,"/")[0]='\0';
 	if (statfs(unuried_fname,&info)==0) {
-	    GnomeVFSFileInfo *file_info = gnome_vfs_file_info_new();
-    	GnomeVFSResult vfs_res = gnome_vfs_get_file_info(CHESS_PAUSE_SAVE_FILE_TMP,
-    	  file_info, GNOME_VFS_FILE_INFO_FOLLOW_LINKS);
-    	if (vfs_res == GNOME_VFS_OK ||
-        	file_info->type == GNOME_VFS_FILE_TYPE_REGULAR) {
+	    GFile *tmp = g_file_new_for_path(CHESS_PAUSE_SAVE_FILE_TMP);
+	    GFileType type = g_file_query_file_type(tmp, G_FILE_QUERY_INFO_NONE, NULL);
+	    g_object_unref(tmp);
+    	if (type == G_FILE_TYPE_REGULAR) {
       		
       		if (0.02>=((double)info.f_bavail/(double)info.f_blocks)) {
 		      	//no more free space
@@ -1397,23 +1342,13 @@ static void game_save(void)
 
   
   /* Copy saved file from temp to destination */
-  tmp_text = gnome_vfs_get_uri_from_local_path(CHESS_PAUSE_SAVE_FILE_TMP);
-        
-  
-  uri_scheme = gnome_vfs_get_uri_scheme(dst_text);
-  if (!uri_scheme)
-    dst_text = gnome_vfs_get_uri_from_local_path(dst_text);
-  else
-    g_free(uri_scheme);
+  tmp_file = g_file_new_for_path(CHESS_PAUSE_SAVE_FILE_TMP);
+  dst_file = g_file_new_for_commandline_arg(dst_text);
+  g_free(dst_text);
+  dst_text = g_file_get_uri(dst_file);
 
-  tmp_uri = gnome_vfs_uri_new(tmp_text);
-  dst_uri = gnome_vfs_uri_new(dst_text);
-
-  vfs_res = gnome_vfs_xfer_uri(tmp_uri, dst_uri,
-            GNOME_VFS_XFER_DEFAULT,
-            GNOME_VFS_XFER_ERROR_MODE_ABORT,
-            GNOME_VFS_XFER_OVERWRITE_MODE_REPLACE,
-            NULL, NULL);
+  copied = g_file_copy(tmp_file, dst_file, G_FILE_COPY_OVERWRITE,
+            NULL, NULL, NULL, &copy_error);
 
         
   if (is_mmc) { /* MMC cover open while saving to MMC */
@@ -1443,13 +1378,8 @@ static void game_save(void)
       gtk_main_iteration();            
   
   /* Copy file error handling */
-  switch (vfs_res) {
-    case GNOME_VFS_OK:
+  if (copied) {
         plugin_show_infoprint(__("sfil_ib_saved"));
-	  	GnomeVFSResult result;
-		result = gnome_vfs_open (&read_handle, dst_text, GNOME_VFS_OPEN_READ);
-		g_assert(result == GNOME_VFS_OK);
-		
 		{
     		gchar *tname = comapp_common_get_display_name(dst_text,NULL,TRUE);
     		if (tname) {
@@ -1459,26 +1389,18 @@ static void game_save(void)
     	}
     			
         chess_saved = TRUE;
-        break;
-        
-        
-      case GNOME_VFS_ERROR_ACCESS_DENIED:
-      case GNOME_VFS_ERROR_READ_ONLY:
-      case GNOME_VFS_ERROR_READ_ONLY_FILE_SYSTEM:
+  } else if (g_error_matches(copy_error, G_IO_ERROR, G_IO_ERROR_PERMISSION_DENIED) ||
+             g_error_matches(copy_error, G_IO_ERROR, G_IO_ERROR_READ_ONLY)) {
 		hildon_banner_show_information( GTK_WIDGET(gs.ui->hildon_appview),
 			NULL, dgettext("hildon-fm", "sfil_ib_readonly_location" ));      
         chess_saved = FALSE;      	
-      	break;
-      
-      case GNOME_VFS_ERROR_NO_MEMORY:
-      case GNOME_VFS_ERROR_NO_SPACE:
-      default:
+  } else {
         chess_saved = FALSE;
         ui_show_nomem_dialog();
-      }
-	gnome_vfs_uri_unref(tmp_uri);
-  gnome_vfs_uri_unref(dst_uri);
-  g_free(tmp_text);
+  }
+  g_clear_error(&copy_error);
+  g_object_unref(tmp_file);
+  g_object_unref(dst_file);
   g_free(dst_text);
   chess_save_done=GAME_SAVE_NONE;
   gtk_signal_disconnect(G_OBJECT(volume_monitor), volume_monitor_id);
@@ -1510,7 +1432,11 @@ static void plugin_ui_cancel_saving(void) {
     plugin_settings_set_string(SETTINGS_CHESS_SAVE_FILE,"");   	          
   
     if (filename) {
-      gnome_vfs_unlink(filename);
+      {
+        GFile *file = g_file_new_for_commandline_arg(filename);
+        g_file_delete(file, NULL, NULL);
+        g_object_unref(file);
+      }
       g_free(filename);
     }
     
@@ -1579,7 +1505,7 @@ void ui_show_nomem_dialog(void)
   hildon_note_set_button_text(note, __("sfil_ni_not_enough_memory_ok"));
   
   /* Rama - changed here */
-  fc_dialog = note;
+  fc_dialog = GTK_WIDGET(note);
   gtk_dialog_run(GTK_DIALOG(note));
   gtk_widget_destroy(GTK_WIDGET(note));
   /* Rama - changed here */
@@ -1647,30 +1573,53 @@ static void plugin_set_settings(void)
 }
 
 static void
-file_monitor_cb( GnomeVFSMonitorHandle *handle, const gchar * monitor_uri,
-	const gchar *info_uri, GnomeVFSMonitorEventType event_type,
-	gpointer user_data) 
+file_monitor_cb( GFileMonitor *monitor, GFile *file, GFile *other_file,
+	GFileMonitorEvent event_type, gpointer user_data) 
 {
 
 	/* If file is changed to read only */
     gboolean sensitivity;
-	if( event_type == GNOME_VFS_MONITOR_EVENT_METADATA_CHANGED ) {
-		GnomeVFSFileInfo info;
+	(void)monitor;
+	(void)other_file;
+	(void)user_data;
+	if( event_type == G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED ) {
+		GFileInfo *info = g_file_query_info( file,
+			G_FILE_ATTRIBUTE_ACCESS_CAN_WRITE, G_FILE_QUERY_INFO_NONE,
+			NULL, NULL );
 		
-		if( gnome_vfs_get_file_info( monitor_uri, &info,
-			GNOME_VFS_FILE_INFO_GET_ACCESS_RIGHTS ) == GNOME_VFS_OK ) {
+		if( info != NULL ) {
 		
             if (save_item != NULL) {    
-                sensitivity = ( info.permissions &  GNOME_VFS_PERM_ACCESS_WRITABLE ) ==  GNOME_VFS_PERM_ACCESS_WRITABLE;
+                sensitivity = g_file_info_get_attribute_boolean( info,
+                	G_FILE_ATTRIBUTE_ACCESS_CAN_WRITE );
 		if (sensitivity)
 		  gtk_widget_show(save_item);
 		else
 		  gtk_widget_hide(save_item);
             }
+		g_object_unref( info );
 		}
 	}
+}
 
-	handle = 0;
-	info_uri = 0;
-	user_data = 0;
+/* Watch the saved game @filename (a path or a URI) for losing its write
+ * permission; NULL stops watching */
+static void
+file_monitor_set( const gchar * filename )
+{
+	if( monitor_handle ) {
+		g_file_monitor_cancel( monitor_handle );
+		g_object_unref( monitor_handle );
+		monitor_handle = NULL;
+	}
+	if( filename ) {
+		GFile *file = g_file_new_for_commandline_arg( filename );
+
+		monitor_handle = g_file_monitor_file( file, G_FILE_MONITOR_NONE,
+			NULL, NULL );
+		g_object_unref( file );
+		if( monitor_handle )
+			g_signal_connect( monitor_handle, "changed",
+				G_CALLBACK( file_monitor_cb ), NULL );
+	}
 }

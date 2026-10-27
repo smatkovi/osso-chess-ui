@@ -88,4 +88,6 @@ void app_remove_timeout(void);
 
 gboolean on_overlay_expose(GtkWidget *widget, GdkEventExpose *event, AppUIData * data);
 gboolean on_back_button_press(GtkWidget *widget, GdkEventButton *event, AppUIData * data);
+gboolean on_overlay_press(GtkWidget *widget, GdkEventButton *event, AppUIData * data);
+gboolean on_overlay_release(GtkWidget *widget, GdkEventButton *event, AppUIData * data);
 gboolean on_back_button_release(GtkWidget *widget, GdkEventButton *event, AppUIData * data);

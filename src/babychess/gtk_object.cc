@@ -226,8 +226,9 @@ Gtk_Object::Signal_Size_Request(GtkWidget *this_gtkwidget,
 	gtk_object->Wdg_Get_Size_Request(w, h, resizeable);
 	if (w <= 0) w= 1;
 	if (h <= 0) h= 1;
-	assert (w < 1000);
-	assert (h < 1000);
+	/* (a sanity check from 800x480 screens, for screens of today) */
+	assert (w < 10000);
+	assert (h < 10000);
 //	Dbg_Int_(w);
 //	Dbg_Int_(h); 
 	requisition->width= w;

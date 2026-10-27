@@ -57,7 +57,7 @@
 #define BOARD_WIDTH 400
 #define BOARD_HEIGHT -1
 
-#define CTRL_WIDTH 220
+#define CTRL_WIDTH 310
 #define CTRL_HEIGHT -1
 
 #define CTRL_IMAGE "Background_control.jpg"
@@ -78,7 +78,7 @@
 #define CTRL_STATUS_BLACK_LEFT 31
 #define CTRL_STATUS_BLACK_TOP  255
 
-#define CTRL_MOVES_TOP  15
+#define CTRL_MOVES_TOP  80
 #define CTRL_MOVES_LEFT 38
 
 #define CHESS_PLAYER1_NAME N_("game_fi_chess_player_1_title")

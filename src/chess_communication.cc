@@ -22,7 +22,7 @@
 */
 
 #include <sys/stat.h>
-#include <libgnomevfs/gnome-vfs.h>
+#include <gio/gio.h>
 #include "chess_communication.hh"
 #include "sound.h"
 #include "state_save.h"
@@ -271,7 +271,8 @@ gint handle_load_game(osso_rpc_t *retval)
         
         if (filename) {
         
-        	GnomeVFSResult vfs_res;
+            GError *copy_error = NULL;
+            gboolean copied;
 
             gchar *temp = g_strdup("/tmp/chessXXXXXX");
             filedesc=mkstemp(temp);
@@ -285,20 +286,15 @@ gint handle_load_game(osso_rpc_t *retval)
                 retval->value.b=FALSE;
                 return OSSO_OK;
             }
-            gchar *tmp_uristr = gnome_vfs_get_uri_from_local_path(temp);
-            GnomeVFSURI *tmp_uri = gnome_vfs_uri_new(tmp_uristr),
-                        *file_uri = gnome_vfs_uri_new(filename);
-            g_free(tmp_uristr);
-            vfs_res = gnome_vfs_xfer_uri(file_uri, tmp_uri,
-                    GNOME_VFS_XFER_DEFAULT,
-                    GNOME_VFS_XFER_ERROR_MODE_ABORT,
-                    GNOME_VFS_XFER_OVERWRITE_MODE_REPLACE,
-                    NULL, NULL);                    
+            /* the saved game (a path or a URI) to a local file */
+            GFile *tmp_file = g_file_new_for_path(temp),
+                  *saved_file = g_file_new_for_commandline_arg(filename);
+            copied = g_file_copy(saved_file, tmp_file,
+                    G_FILE_COPY_OVERWRITE, NULL, NULL, NULL, &copy_error);
+            g_object_unref(tmp_file);
+            g_object_unref(saved_file);
 
-            gnome_vfs_uri_unref(tmp_uri);
-            gnome_vfs_uri_unref(file_uri);
-
-            if (vfs_res == GNOME_VFS_OK && chess_engine->load(temp)) {
+            if (copied && chess_engine->load(temp)) {
                 app_data->app_ui_data->game_loading = TRUE;
 
                 /* Load UI part */
@@ -360,10 +356,11 @@ gint handle_load_game(osso_rpc_t *retval)
                 retval->value.b=TRUE;
             } else {
             
-            	if( vfs_res != GNOME_VFS_OK ) {
+            	if( !copied ) {
                		g_warning( "Error '%s' while copying '%s' to '%s'",
-               			gnome_vfs_result_to_string( vfs_res ),
+               			copy_error->message,
                			filename, temp );
+               		g_clear_error(&copy_error);
                	} else {
                		g_warning( "File '%s' not accepted by engine", filename );               	
                	}

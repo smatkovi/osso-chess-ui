@@ -44,6 +44,7 @@ bool Board::Open(Pointer <Widget> parent,
 	generator= open_info.generator; 
 	square_width= -1;
 	last_a= last_b= 0; 
+	tap_from= 0;
 	selection[0]= selection[1]= 0;
 
 	osso_log(LOG_DEBUG,"Board: Widget Open");
@@ -62,6 +63,11 @@ bool Board::Open(Pointer <Widget> parent,
 	BOARD_TOP = frame_width - BOARD_IMAGE_TOP;
 	osso_log(LOG_DEBUG,"Board: Open: Read board image");
 	::Read_Image();
+	/* Without a picture of the board (it was the N900's, drawn for its
+	 * 56 pixel squares) the board is drawn here, at any size: the squares
+	 * right inside the frame */
+	if (! ::Get_Image()->Is())
+		BOARD_LEFT = BOARD_TOP = 0;
 
 	osso_log(LOG_DEBUG,"Board: Open: Change size");
 	Change_Sized_Image();
@@ -106,7 +112,11 @@ void Board::Change_Sized_Image()
 	Interrupt_Dragging();
 
 	int w=36;
+	if (! ::Get_Image()->Is())
+		w= 2 * frame_width;
 	int new_square_width= 1 + max((min(Get_Size().x, Get_Size().y) - w) / 8, 1); 
+	if (! ::Get_Image()->Is())
+		new_square_width= max((min(Get_Size().x, Get_Size().y) - w) / 8, 1); 
 
 	if (new_square_width != square_width)
 	{
@@ -361,6 +371,15 @@ void Board::Wdg_Mouse(Mouse_Action ma,
 			if (! Is_Inside_Square(drag_to))
 				drag_to= 0;
 
+			/* Released where it was pressed: a tap on the piece,
+			 * which stays selected for a tap on its destination */
+			if (drag_to == drag_from)
+			{
+				tap_from= drag_from;
+				return;
+			}
+			tap_from= 0;
+
 			Parent_Send_Message(msg_move);
 
 			Invalidate_Square(cursorpos, false);
@@ -387,6 +406,28 @@ void Board::Wdg_Mouse(Mouse_Action ma,
 			if (! Is_Inside_Square(drag_from))
 				return;
 			dragged_piece= position/*->Get_Piece*/()[drag_from];
+
+			/* After a tap on a piece of ours, a tap on a square
+			 * without one: the move there */
+			if (tap_from && tap_from != drag_from &&
+			    position()[tap_from].Is() &&
+			    position()[tap_from].Is_Piece_Of_Color(
+				    get_app_data()->app_ui_data->game->Get_Turn()) &&
+			    ! (dragged_piece.Is() && dragged_piece.Is_Piece_Of_Color(
+				    get_app_data()->app_ui_data->game->Get_Turn())))
+			{
+				drag_to= drag_from;
+				drag_from= tap_from;
+				tap_from= 0;
+				Parent_Send_Message(msg_move);
+
+				Invalidate_Square(cursorpos, false);
+				cursorpos= drag_to;
+				Invalidate_Square(cursorpos, true);
+				return;
+			}
+			tap_from= 0;
+
 			if (! dragged_piece.Is())
 				/* Drag an empty square. 
 				 */ 

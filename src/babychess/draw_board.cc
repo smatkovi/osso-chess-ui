@@ -86,9 +86,44 @@ void Draw_Rectangle(Canvas &canvas,
   (void)rect;
 }
 
+/* The selected square's corners, or the legal move's dot, in the colours
+ * of the board's settings: drawn at any size where there are no pictures
+ * of them */
+static void Draw_Corners(Canvas &canvas, Rect rect)
+{
+	int w= max(rect.size.x / 14, 2);
+	int l= rect.size.x / 4;
+	Point a= rect.origin, b= rect.origin + rect.size - Point(1);
+
+	canvas.Set_Draw_Mode(Canvas::dm_copy);
+	canvas.Set_Color(Canvas::Get_Color(RGB(255, 196, 0)), true);
+	canvas.Draw_Rect(Rect(a.x, a.y, l, w));
+	canvas.Draw_Rect(Rect(a.x, a.y, w, l));
+	canvas.Draw_Rect(Rect(b.x - l + 1, a.y, l, w));
+	canvas.Draw_Rect(Rect(b.x - w + 1, a.y, w, l));
+	canvas.Draw_Rect(Rect(a.x, b.y - w + 1, l, w));
+	canvas.Draw_Rect(Rect(a.x, b.y - l + 1, w, l));
+	canvas.Draw_Rect(Rect(b.x - l + 1, b.y - w + 1, l, w));
+	canvas.Draw_Rect(Rect(b.x - w + 1, b.y - l + 1, w, l));
+}
+
+static void Draw_Dot(Canvas &canvas, Rect rect)
+{
+	int d= rect.size.x / 3;
+
+	canvas.Set_Draw_Mode(Canvas::dm_copy);
+	canvas.Set_Color(Canvas::Get_Color(RGB(255, 196, 0)), true);
+	canvas.Draw_Ellipse(Rect(rect.origin.x + (rect.size.x - d) / 2,
+				 rect.origin.y + (rect.size.y - d) / 2, d, d));
+}
+
 void Draw_Selection_Rectangle(Canvas &canvas, 
 		 Rect rect)
 {
+	if (! selection.Is()) {
+		Draw_Corners(canvas, rect);
+		return;
+	}
 	if ( selection.Is() && selection.Get_Alpha_Image().Has_Canvas() ) {
 		canvas.Set_Draw_Mode(Canvas::dm_andnot);
     //canvas.Set_Draw_Mode(Canvas::dm_copy);
@@ -108,6 +143,10 @@ void Draw_Selection_Rectangle(Canvas &canvas,
 void Draw_Legal_Rectangle(Canvas &canvas, 
 		 Rect rect)
 {
+	if (! legal.Is()) {
+		Draw_Dot(canvas, rect);
+		return;
+	}
 	if ( legal.Is() && legal.Get_Alpha_Image().Has_Canvas() ) {
 		canvas.Set_Draw_Mode(Canvas::dm_andnot);
 		canvas.Draw_Canvas(legal.Get_Alpha_Image()(),

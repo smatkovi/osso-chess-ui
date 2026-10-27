@@ -1,7 +1,8 @@
 usr/bin
-usr/lib/osso-chess-ui
+usr/lib/osso-chess-ui/*.so
 usr/share/applications
 usr/share/mime/packages
 usr/share/dbus-1
 usr/share/osso-chess-ui
+usr/share/pixmaps
 etc/osso-backup

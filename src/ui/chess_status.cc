@@ -21,6 +21,7 @@
     02111-1307 USA
 */
 
+#include "babychess/ui_scale.hh"
 #include "chess_status.hh"
 
 #define STATUS_ACTIVE      "Black_White_active.jpg"
@@ -78,8 +79,8 @@ void Chess_Status::Wdg_Draw(Canvas &canvas)
   if (text!=NULL && strlen(text)>0) {
     canvas.Draw_Label(Get(),
       STATUS_FONT_SIZE,
-      Point(STATUS_LABEL_LEFT,
-      size.y/3+STATUS_LABEL_TOP), text);
+      Point(UI_LENGTH(STATUS_LABEL_LEFT),
+      size.y/3+UI_LENGTH(STATUS_LABEL_TOP)), text);
   }
 
   if (!sized) {

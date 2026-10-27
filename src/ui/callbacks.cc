@@ -207,43 +207,47 @@ void app_remove_timeout(void)
     }
 }
 
+/* The back button over the top right corner (to the game's start screen):
+ * its icon on the panel's colour, at any size */
 gboolean on_overlay_expose(GtkWidget *widget, GdkEventExpose * event, AppUIData *data)
 {
 	AppUIData *app_ui_data = (AppUIData *)data;
-	GdkPixmap *pixmap;
-	GdkBitmap *bitmask;
+	GtkAllocation *a = &widget->allocation;
+	GdkGC *gc = gdk_gc_new(widget->window);
+	GdkColor panel = { 0, 46 * 257, 52 * 257, 58 * 257 };
 
-	GdkColormap *colormap = gdk_screen_get_rgba_colormap(gtk_widget_get_screen(
-				   GTK_WIDGET(app_ui_data->overlay_button)));
+	(void)event;
+	gdk_gc_set_rgb_fg_color(gc, &panel);
+	gdk_draw_rectangle(widget->window, gc, TRUE, 0, 0, a->width, a->height);
+	g_object_unref(gc);
+	if (app_ui_data->overlay_back) {
+		int w = gdk_pixbuf_get_width(app_ui_data->overlay_back);
+		int h = gdk_pixbuf_get_height(app_ui_data->overlay_back);
 
-	g_assert(colormap);
-	gdk_drawable_set_colormap(GTK_WIDGET(app_ui_data->overlay_button)->window,
-					colormap);
-	gdk_pixbuf_render_pixmap_and_mask_for_colormap (app_ui_data->overlay_back,
-						colormap,
-						&pixmap, &bitmask,
-						127);
-	if(pixmap)
-	{
-	g_assert(pixmap);
-		gdk_window_set_back_pixmap(GTK_WIDGET(app_ui_data->overlay_button)->window,
-				pixmap, FALSE); 
-		g_object_unref(pixmap);
+		gdk_draw_pixbuf(widget->window, NULL, app_ui_data->overlay_back,
+				0, 0, (a->width - w) / 2, (a->height - h) / 2, w, h,
+				GDK_RGB_DITHER_NONE, 0, 0);
 	}
-	if(bitmask)
-	{	
-		 gdk_window_shape_combine_mask(GTK_WIDGET(app_ui_data->overlay_button)->window,
-				 bitmask, 0, 0);
-		 g_object_unref(bitmask);
-	}
-	gdk_draw_pixbuf(GTK_WIDGET(app_ui_data->overlay_button)->window,
-	                GTK_WIDGET(app_ui_data->overlay_button)->style->fg_gc[GTK_STATE_NORMAL],
-	                app_ui_data->overlay_back, 0, 0,
-	                CTRL_OVR_BUTTON_LEFT, CTRL_OVR_BUTTON_TOP,
-	                CTRL_OVR_BUTTON_W, CTRL_OVR_BUTTON_H,
-			GDK_RGB_DITHER_NONE, 0, 0);
 	return TRUE;
-}	
+}
+
+gboolean on_overlay_press(GtkWidget *widget, GdkEventButton *event, AppUIData * data)
+{
+	(void)widget;
+	(void)event;
+	(void)data;
+	is_back_key_press = TRUE;
+	return TRUE;
+}
+
+gboolean on_overlay_release(GtkWidget *widget, GdkEventButton *event, AppUIData * data)
+{
+	if (is_back_key_press && event->x >= 0 && event->y >= 0 &&
+	    event->x < widget->allocation.width && event->y < widget->allocation.height)
+		chess_pause(widget, data);
+	is_back_key_press = FALSE;
+	return TRUE;
+}
 
 gboolean on_back_button_press(GtkWidget *widget, GdkEventButton *event, AppUIData * data)
 {

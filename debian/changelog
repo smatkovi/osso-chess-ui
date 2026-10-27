@@ -1,3 +1,22 @@
+osso-chess-ui (1.8.3-2+leste1) unstable; urgency=low
+
+  * Maemo Leste (daedalus) and FreeBSD port.
+  * GIO instead of GnomeVFS (gone from Debian).
+  * GNU Chess 6: its "My move is : e7e5" and "Invalid move" replies; the
+    engine's path from configure (--with-gnuchess).
+  * Own pictures: the pieces are Colin M. L. Burnett's (GPL/BSD/GFDL), the
+    control panel is drawn by data/make-art.py; the board, its frame and
+    marks are drawn by the program at any size. The N900's pictures were
+    Nokia's (osso-graphics-game-chess) and are not used.
+  * The layout scales with the screen (its height over 480): the F(x)tec
+    Pro1X's 2160x1080 as the N900's 800x480.
+  * A tap on a piece and a tap on its destination moves it (dragging still
+    does).
+  * Builds as C++ with $(CXX) (cross compilers), the plugin as a libtool
+    module; nothing below /usr hard-coded.
+
+ -- Sebastian Matkovich <sebastian.matkovich@gmail.com>  Tue, 27 Oct 2026 13:00:00 +0100
+
 osso-chess-ui (1.8.3-1+0m5) unstable; urgency=low
 
   * This entry has been added by BIFH queue processor

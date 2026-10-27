@@ -21,7 +21,6 @@
     02111-1307 USA
 */
 
-#include <libgnomevfs/gnome-vfs.h>
 #include "main.hh"
 #include "sound.h"
 #include <hildon/hildon.h>
@@ -70,13 +69,6 @@ int main(int argc, char** argv)
     return 1;
   }
 
-  if (!gnome_vfs_initialized()) {
-    if (!gnome_vfs_init()) {
-      osso_log(LOG_ERR, "Could not init GnomeVFS");
-      return 1;
-    } 
-  }
-  
   /* Init osso */
   if (!init_osso(app_data)) {
     osso_log(LOG_ERR,"Osso initialization failed");
@@ -97,9 +89,6 @@ int main(int argc, char** argv)
 
   gtk_main();
 
-  if (gnome_vfs_initialized()) {
-    gnome_vfs_shutdown();
-  }
   deinit_engine();
   deinit_osso(app_data);
 

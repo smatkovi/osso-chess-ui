@@ -146,6 +146,8 @@ private:
 	 */
 	int drag_from;
 	int drag_to;
+	int tap_from;    /* a piece tapped (pressed and released on its
+			    square): a tap on another square moves it there */
 	bool engine_thinking;
 	Piece dragged_piece;
 	Server_Image drag_img;
